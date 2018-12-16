@@ -6,6 +6,40 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Inputs\input1.txt" />
+    <None Remove="Inputs\input2.txt" />
+    <None Remove="Inputs\input3.txt" />
+    <None Remove="Inputs\input4.txt" />
+    <None Remove="Inputs\input5.txt" />
+    <None Remove="Inputs\input6.txt" />
+    <None Remove="Inputs\input7.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Inputs\input1.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Inputs\input2.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Inputs\input3.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Inputs\input4.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Inputs\input5.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Inputs\input6.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Inputs\input7.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="TextCopy" Version="1.5.0" />
   </ItemGroup>
 

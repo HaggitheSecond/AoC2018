@@ -4,18 +4,18 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
+using AoC2018.Extensions;
+using AoC2018.Helpers;
 using TextCopy;
 
 namespace AoC2018
 {
-    class Program
+    internal class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             if (Debugger.IsAttached == false)
             {
@@ -49,7 +49,7 @@ namespace AoC2018
                         continue;
                     }
 
-                    if (int.TryParse(input, out int requestedDay) == false)
+                    if (int.TryParse(input, out var requestedDay) == false)
                     {
                         Console.WriteLine("Your requested day is not available, please try again!");
                         continue;
@@ -89,7 +89,7 @@ namespace AoC2018
                 }
             }
 
-            new Day3().Part1();
+            new Day7().Part2();
             //new Day5().Part2();
 
             Console.ReadKey();
@@ -98,21 +98,35 @@ namespace AoC2018
 
     public class Day7 : IAoCDay
     {
-        public AoCCompletionStatus Status => AoCCompletionStatus.WIP;
+        public AoCCompletionStatus Status
+        {
+            get { return AoCCompletionStatus.WIP; }
+        }
 
         public void Part1()
         {
-            var input = Helpers.GetInput(7);
+            var input = InputHelper.GetInput(7);
 
-            var steps = this.DiscoverSteps(input);
-            var path = this.DiscoverPath(steps);
+            var steps = DiscoverSteps(input);
+            var path = DiscoverPath(steps);
+
+            Console.WriteLine(path);
+        }
+
+
+        public void Part2()
+        {
+            var input = InputHelper.GetInput(7);
+
+            var steps = DiscoverSteps(input);
+            var path = DiscoverPathForMultipleWorkers(steps, 5);
 
             Console.WriteLine(path);
         }
 
         private string DiscoverPath(IList<Step> steps)
         {
-            return string.Join("", steps.Where(f => f.RequiredSteps.Count == 0).Select(this.ExecuteStep));
+            return string.Join("", steps.Where(f => f.RequiredSteps.Count == 0).Select(ExecuteStep));
         }
 
         private string ExecuteStep(Step step)
@@ -121,37 +135,20 @@ namespace AoC2018
 
             var steps = string.Empty;
 
-            while (step.RequiredForSteps.Any(f => f.CanBeExecuted && f.HasBeenExecuted == false))
-            {
-                steps += this.ExecuteStep(step.RequiredForSteps.First(f => f.CanBeExecuted && f.HasBeenExecuted == false));
-            }
+            while (step.RequiredForSteps.Any(f => f.CanBeExecuted && f.HasBeenExecuted == false)) steps += ExecuteStep(step.RequiredForSteps.First(f => f.CanBeExecuted && f.HasBeenExecuted == false));
 
             return step.Id + string.Join("", steps);
         }
 
-
-        public void Part2()
-        {
-            var input = Helpers.GetInput(7);
-
-            var steps = this.DiscoverSteps(input);
-            var path = this.DiscoverPathForMultipleWorkers(steps, 5);
-
-            Console.WriteLine(path);
-        }
-
         private string DiscoverPathForMultipleWorkers(IList<Step> steps, int workers)
         {
-            foreach (var currentStep in steps)
-            {
-                currentStep.TimeLeft = currentStep.TimeNeeded;
-            }
+            foreach (var currentStep in steps) currentStep.TimeLeft = currentStep.TimeNeeded;
 
             var result = string.Empty;
 
             for (var i = 0; i < int.MaxValue; i++)
             {
-                var stepsToExecuteNow = steps.SelectMany(this.DiscoverNextExecutableTimeBasedStep)
+                var stepsToExecuteNow = steps.SelectMany(DiscoverNextExecutableTimeBasedStep)
                     .ToHashSet()
                     .OrderBy(f => f.TimeLeft != f.TimeNeeded)
                     .Take(workers)
@@ -172,31 +169,41 @@ namespace AoC2018
                         currentStepToExecute.HasBeenExecuted = true;
                         result += currentStepToExecute.Id;
 
-                        Console.BackgroundColor = ConsoleColor.Red;
+                        Console.ForegroundColor = ConsoleColor.Red;
                     }
                 }
 
-                Console.WriteLine(i.FormatForDisplay() + "   " + string.Join("   ", executedSteps.Select(f => $"{f.Id}({f.TimeLeft.FormatForDisplay()})")) + "    " + result);
+                if (Debugger.IsAttached)
+                    Console.WriteLine(i.FormatForDisplay() + "   "
+                                                           + string.Join("   ", executedSteps.Select(f => $"{f.Id}({f.TimeLeft.FormatForDisplay()})"))
+                                                           + AddWhiteSpaceForFormatting(workers - executedSteps.Count, "          ")
+                                                           + "  " + result);
 
                 Console.ResetColor();
             }
 
             return result;
+
+            string AddWhiteSpaceForFormatting(int count, string @string)
+            {
+                var resultString = string.Empty;
+
+                for (var i = 0; i < count; i++) resultString += @string;
+
+                return resultString;
+            }
         }
 
         private IEnumerable<Step> DiscoverNextExecutableTimeBasedStep(Step step)
         {
             var nextSteps = new List<Step>();
 
-            if (step.CanBeExecuted == true && step.HasBeenExecuted == false)
+            if (step.CanBeExecuted && step.HasBeenExecuted == false)
                 nextSteps.Add(step);
 
             var finishedSteps = step.RequiredForSteps.Where(f => f.HasBeenExecuted);
 
-            foreach (var currentFinishedStep in finishedSteps)
-            {
-                nextSteps.AddRange(this.DiscoverNextExecutableTimeBasedStep(currentFinishedStep));
-            }
+            foreach (var currentFinishedStep in finishedSteps) nextSteps.AddRange(DiscoverNextExecutableTimeBasedStep(currentFinishedStep));
 
             nextSteps.AddRange(step.RequiredForSteps.Where(f => f.HasBeenExecuted == false && f.CanBeExecuted));
 
@@ -236,14 +243,12 @@ namespace AoC2018
             steps = steps.OrderBy(f => f.Id).ToList();
 
             foreach (var currentStep in steps)
+            foreach (var currentInput in parsedInput.Where(f => f.StepId == currentStep.Id).ToList())
             {
-                foreach (var currentInput in parsedInput.Where(f => f.StepId == currentStep.Id).ToList())
-                {
-                    var requiredStep = steps.First(f => f.Id == currentInput.RequiredStepId);
+                var requiredStep = steps.First(f => f.Id == currentInput.RequiredStepId);
 
-                    currentStep.RequiredSteps.Add(requiredStep);
-                    requiredStep.RequiredForSteps.Add(currentStep);
-                }
+                currentStep.RequiredSteps.Add(requiredStep);
+                requiredStep.RequiredForSteps.Add(currentStep);
             }
 
             return steps;
@@ -259,28 +264,37 @@ namespace AoC2018
 
             public bool HasBeenExecuted { get; set; }
 
-            public bool CanBeExecuted => this.RequiredSteps.All(f => f.HasBeenExecuted);
+            public bool CanBeExecuted
+            {
+                get { return RequiredSteps.All(f => f.HasBeenExecuted); }
+            }
 
-            public int TimeNeeded => 61 + this.Id - 'A';
+            public int TimeNeeded
+            {
+                get { return 61 + Id - 'A'; }
+            }
 
             public int TimeLeft { get; set; }
 
             public override string ToString()
             {
-                return $"{nameof(this.Id)} {this.Id}; " +
-                       $" {nameof(this.CanBeExecuted)} {this.CanBeExecuted}; " +
-                       $" {nameof(this.HasBeenExecuted)} {this.HasBeenExecuted}; ";
+                return $"{nameof(Id)} {Id}; " +
+                       $" {nameof(CanBeExecuted)} {CanBeExecuted}; " +
+                       $" {nameof(HasBeenExecuted)} {HasBeenExecuted}; ";
             }
         }
     }
 
     public class Day6 : IAoCDay
     {
-        public AoCCompletionStatus Status => AoCCompletionStatus.WIP;
+        public AoCCompletionStatus Status
+        {
+            get { return AoCCompletionStatus.WIP; }
+        }
 
         public void Part1()
         {
-            var input = Helpers.GetInput(6).Select(f =>
+            var input = InputHelper.GetInput(6).Select(f =>
             {
                 var result = Regex.Matches(f, "(\\d+)").Select(g => int.Parse(g.Value)).ToList();
 
@@ -289,7 +303,6 @@ namespace AoC2018
 
             foreach (var currentPoint in input)
             {
-
             }
         }
 
@@ -301,14 +314,17 @@ namespace AoC2018
 
     public class Day5 : IAoCDay
     {
-        public AoCCompletionStatus Status => AoCCompletionStatus.Completed;
+        public AoCCompletionStatus Status
+        {
+            get { return AoCCompletionStatus.Completed; }
+        }
 
         public void Part1()
         {
             Console.WriteLine("This might take a while...");
 
-            var input = Helpers.GetInput(5).First();
-            var result = this.ReduceFully(input);
+            var input = InputHelper.GetInput(5).First();
+            var result = ReduceFully(input);
 
             Console.WriteLine($"Reduced input from {input.Length} to {result.Length}");
             Clipboard.SetText(input.Length.ToString());
@@ -318,22 +334,19 @@ namespace AoC2018
         {
             Console.WriteLine("This might take a while...");
 
-            var input = Helpers.GetInput(5).First();
+            var input = InputHelper.GetInput(5).First();
 
             var results = new ConcurrentDictionary<char, string>();
 
-            Parallel.ForEach(Helpers.AllLowercaseLetters, f =>
+            Parallel.ForEach(CharHelper.AllLowercaseLetters, f =>
             {
                 var inputWithoutCurrentChar = input.Replace("" + f, "").Replace("" + char.ToUpper(f), "");
-                var reduced = this.ReduceFully(inputWithoutCurrentChar);
+                var reduced = ReduceFully(inputWithoutCurrentChar);
 
                 results.TryAdd(f, reduced);
             });
 
-            foreach (var currentResult in results.OrderBy(f => f.Value.Length))
-            {
-                Console.WriteLine(currentResult.Key + " " + currentResult.Value.Length);
-            }
+            foreach (var currentResult in results.OrderBy(f => f.Value.Length)) Console.WriteLine(currentResult.Key + " " + currentResult.Value.Length);
 
             Console.ReadKey();
         }
@@ -343,16 +356,13 @@ namespace AoC2018
             while (true)
             {
                 var parts = new ConcurrentBag<string>();
-                for (var i = 0; i < input.Length; i += 100)
-                {
-                    parts.Add(input.Substring(i, Math.Min(100, input.Length - i)));
-                }
+                for (var i = 0; i < input.Length; i += 100) parts.Add(input.Substring(i, Math.Min(100, input.Length - i)));
 
                 var anyWasReduced = false;
                 var results = new ConcurrentBag<string>();
                 Parallel.ForEach(parts, f =>
                 {
-                    var reduced = this.TryReduce(f, out var reducedResult);
+                    var reduced = TryReduce(f, out var reducedResult);
 
                     results.Add(reducedResult);
                     anyWasReduced = reduced;
@@ -401,13 +411,36 @@ namespace AoC2018
 
     public class Day4 : IAoCDay
     {
-        public AoCCompletionStatus Status => AoCCompletionStatus.Completed;
+        public enum InputType
+        {
+            ShiftStart,
+            FallingAsleep,
+            WakingUp
+        }
+
+        public AoCCompletionStatus Status
+        {
+            get { return AoCCompletionStatus.Completed; }
+        }
 
         public void Part1()
         {
-            var input = this.ParseInput(Helpers.GetInput(4)).OrderBy(f => f.Time).ToList();
+            var input = ParseInput(InputHelper.GetInput(4)).OrderBy(f => f.Time).ToList();
 
-            var guards = this.GetGuardSleepPatterns(input).OrderByDescending(f => f.TotalTimeAsleep).ToList();
+            var guards = GetGuardSleepPatterns(input).OrderByDescending(f => f.TotalTimeAsleep).ToList();
+            var laziestGuard = guards.First();
+
+            Console.WriteLine(laziestGuard.GuardId * laziestGuard.MostAsleepMinute);
+        }
+
+        public void Part2()
+        {
+            var input = ParseInput(InputHelper.GetInput(4)).OrderBy(f => f.Time).ToList();
+
+            var guards = GetGuardSleepPatterns(input)
+                .OrderByDescending(f => f.MostAsleepMinuteSleepCount)
+                .ToList();
+
             var laziestGuard = guards.First();
 
             Console.WriteLine(laziestGuard.GuardId * laziestGuard.MostAsleepMinute);
@@ -453,24 +486,10 @@ namespace AoC2018
                         StartDate = value1.Time,
                         EndDate = value2.Time
                     });
-
                 }
             }
 
             return guards;
-        }
-
-        public void Part2()
-        {
-            var input = this.ParseInput(Helpers.GetInput(4)).OrderBy(f => f.Time).ToList();
-
-            var guards = this.GetGuardSleepPatterns(input)
-                .OrderByDescending(f => f.MostAsleepMinuteSleepCount)
-                .ToList();
-
-            var laziestGuard = guards.First();
-
-            Console.WriteLine(laziestGuard.GuardId * laziestGuard.MostAsleepMinute);
         }
 
 
@@ -511,24 +530,26 @@ namespace AoC2018
             public string Value { get; set; }
         }
 
-        public enum InputType
-        {
-            ShiftStart,
-            FallingAsleep,
-            WakingUp
-        }
-
         private class GuardSleepPattern
         {
             public int GuardId { get; set; }
 
             public IList<HardAtWorkTime> Patterns { get; set; }
 
-            public int TotalTimeAsleep => (int)this.Patterns.Sum(f => f.Duration.TotalMinutes);
+            public int TotalTimeAsleep
+            {
+                get { return (int) Patterns.Sum(f => f.Duration.TotalMinutes); }
+            }
 
-            public int MostAsleepMinute => this.GetTimesAsleepCount().OrderByDescending(f => f.Value).First().Key;
+            public int MostAsleepMinute
+            {
+                get { return GetTimesAsleepCount().OrderByDescending(f => f.Value).First().Key; }
+            }
 
-            public int MostAsleepMinuteSleepCount => this.GetTimesAsleepCount().OrderByDescending(f => f.Value).First().Value;
+            public int MostAsleepMinuteSleepCount
+            {
+                get { return GetTimesAsleepCount().OrderByDescending(f => f.Value).First().Value; }
+            }
 
             private Dictionary<int, int> GetTimesAsleepCount()
             {
@@ -538,12 +559,9 @@ namespace AoC2018
                 {
                     var sleepCount = 0;
 
-                    foreach (var currentSleepTime in this.Patterns)
-                    {
+                    foreach (var currentSleepTime in Patterns)
                         if (currentSleepTime.StartDate.Minute <= i && currentSleepTime.EndDate.Minute >= i)
                             sleepCount++;
-
-                    }
 
                     sleepCounts.Add(i, sleepCount);
                 }
@@ -553,7 +571,7 @@ namespace AoC2018
 
             public override string ToString()
             {
-                return $"#{this.GuardId} {this.TotalTimeAsleep}";
+                return $"#{GuardId} {TotalTimeAsleep}";
             }
         }
 
@@ -563,46 +581,50 @@ namespace AoC2018
 
             public DateTime EndDate { get; set; }
 
-            public TimeSpan Duration => this.EndDate - this.StartDate;
+            public TimeSpan Duration
+            {
+                get { return EndDate - StartDate; }
+            }
         }
     }
 
     public class Day3 : IAoCDay
     {
-        public AoCCompletionStatus Status => AoCCompletionStatus.NO;
+        public AoCCompletionStatus Status
+        {
+            get { return AoCCompletionStatus.NO; }
+        }
 
         public void Part1()
         {
-            var input = this.ParseInput(Helpers.GetInput(3)).ToList();
+            var input = ParseInput(InputHelper.GetInput(3)).ToList();
 
             var overlaps = new List<Overlap>();
 
             foreach (var currentRectangle in input)
+            foreach (var currentRectangleToCompare in input.Where(f => ReferenceEquals(f, currentRectangle) == false
+                                                                       && currentRectangle.Rectangle.IntersectsWith(f.Rectangle)))
             {
-                foreach (var currentRectangleToCompare in input.Where(f => object.ReferenceEquals(f, currentRectangle) == false
-                                                                           && currentRectangle.Rectangle.IntersectsWith(f.Rectangle)))
+                var overlapsWith = overlaps.FirstOrDefault(f => f.IntersectsWith(currentRectangleToCompare.Rectangle));
+
+                if (overlapsWith == null)
                 {
-                    var overlapsWith = overlaps.FirstOrDefault(f => f.IntersectsWith(currentRectangleToCompare.Rectangle));
-
-                    if (overlapsWith == null)
+                    overlaps.Add(new Overlap
                     {
-                        overlaps.Add(new Overlap
+                        InvolvedRectangles = new List<RectangleWithId>
                         {
-                            InvolvedRectangles = new List<RectangleWithId>
-                            {
-                                currentRectangle,
-                                currentRectangleToCompare
-                            }
-                        });
-                    }
-                    else
-                    {
-                        if (overlapsWith.InvolvedRectangles.Contains(currentRectangle) == false)
-                            overlapsWith.InvolvedRectangles.Add(currentRectangle);
+                            currentRectangle,
+                            currentRectangleToCompare
+                        }
+                    });
+                }
+                else
+                {
+                    if (overlapsWith.InvolvedRectangles.Contains(currentRectangle) == false)
+                        overlapsWith.InvolvedRectangles.Add(currentRectangle);
 
-                        if (overlapsWith.InvolvedRectangles.Contains(currentRectangleToCompare) == false)
-                            overlapsWith.InvolvedRectangles.Add(currentRectangleToCompare);
-                    }
+                    if (overlapsWith.InvolvedRectangles.Contains(currentRectangleToCompare) == false)
+                        overlapsWith.InvolvedRectangles.Add(currentRectangleToCompare);
                 }
             }
 
@@ -612,7 +634,6 @@ namespace AoC2018
 
         public void Part2()
         {
-
         }
 
         private IEnumerable<RectangleWithId> ParseInput(IList<string> input)
@@ -637,10 +658,7 @@ namespace AoC2018
             {
                 Rectangle? overlapRectangle = null;
 
-                for (var i = 0; i < this.InvolvedRectangles.Count - 1; i++)
-                {
-                    overlapRectangle = Rectangle.Intersect(this.InvolvedRectangles[i].Rectangle, overlapRectangle ?? this.InvolvedRectangles[i].Rectangle);
-                }
+                for (var i = 0; i < InvolvedRectangles.Count - 1; i++) overlapRectangle = Rectangle.Intersect(InvolvedRectangles[i].Rectangle, overlapRectangle ?? InvolvedRectangles[i].Rectangle);
 
                 if (overlapRectangle.HasValue == false)
                     throw new Exception("This group is bad");
@@ -648,10 +666,15 @@ namespace AoC2018
                 return overlapRectangle.Value;
             }
 
-            public bool IntersectsWith(Rectangle rectangle) => this.GetOverlapInternal().IntersectsWith(rectangle);
+            public bool IntersectsWith(Rectangle rectangle)
+            {
+                return GetOverlapInternal().IntersectsWith(rectangle);
+            }
 
-            public int CalculateOverlap() => this.GetOverlapInternal().Height * this.GetOverlapInternal().Width;
-
+            public int CalculateOverlap()
+            {
+                return GetOverlapInternal().Height * GetOverlapInternal().Width;
+            }
         }
 
         private class RectangleWithId
@@ -662,18 +685,21 @@ namespace AoC2018
 
             public override string ToString()
             {
-                return "#" + this.Id + " " + this.Rectangle;
+                return "#" + Id + " " + Rectangle;
             }
         }
     }
 
     public class Day2 : IAoCDay
     {
-        public AoCCompletionStatus Status => AoCCompletionStatus.Completed;
+        public AoCCompletionStatus Status
+        {
+            get { return AoCCompletionStatus.Completed; }
+        }
 
         public void Part1()
         {
-            var input = Helpers.GetInput(2);
+            var input = InputHelper.GetInput(2);
 
             var doubles = 0;
             var tripples = 0;
@@ -683,7 +709,7 @@ namespace AoC2018
                 var isDouble = false;
                 var isTripple = false;
 
-                foreach (var currentLetter in Helpers.AllLowercaseLetters)
+                foreach (var currentLetter in CharHelper.AllLowercaseLetters)
                 {
                     var count = currentInput.Count(f => f == currentLetter);
 
@@ -703,30 +729,23 @@ namespace AoC2018
 
         public void Part2()
         {
-            var input = Helpers.GetInput(2);
+            var input = InputHelper.GetInput(2);
 
             var matchingStrings = string.Empty;
 
             foreach (var currentInput in input)
+            foreach (var currentComparedInput in input)
             {
-                foreach (var currentComparedInput in input)
-                {
-                    var differentLetters = currentInput.Length;
-                    var differentLetterPos = 0;
+                var differentLetters = currentInput.Length;
+                var differentLetterPos = 0;
 
-                    for (int i = 0; i < currentInput.Length; i++)
-                    {
-                        if (currentInput[i] == currentComparedInput[i])
-                            differentLetters -= 1;
-                        else
-                            differentLetterPos = i;
-                    }
+                for (var i = 0; i < currentInput.Length; i++)
+                    if (currentInput[i] == currentComparedInput[i])
+                        differentLetters -= 1;
+                    else
+                        differentLetterPos = i;
 
-                    if (differentLetters == 1)
-                    {
-                        matchingStrings = currentInput.Remove(differentLetterPos, 1);
-                    }
-                }
+                if (differentLetters == 1) matchingStrings = currentInput.Remove(differentLetterPos, 1);
             }
 
             Console.WriteLine(matchingStrings);
@@ -735,26 +754,26 @@ namespace AoC2018
 
     public class Day1 : IAoCDay
     {
-        public AoCCompletionStatus Status => AoCCompletionStatus.Completed;
+        public AoCCompletionStatus Status
+        {
+            get { return AoCCompletionStatus.Completed; }
+        }
 
         public void Part1()
         {
-            var input = Helpers.GetInput(1);
+            var input = InputHelper.GetInput(1);
 
             var resultingFrequency = 0;
 
-            foreach (var currentInput in input)
-            {
-                resultingFrequency += int.Parse(currentInput);
-            }
+            foreach (var currentInput in input) resultingFrequency += int.Parse(currentInput);
 
             Console.WriteLine(resultingFrequency);
         }
 
         public void Part2()
         {
-            var input = Helpers.GetInput(1);
-            var firstTwice = this.CalculateFirstFrequencyReacedTwice(input);
+            var input = InputHelper.GetInput(1);
+            var firstTwice = CalculateFirstFrequencyReacedTwice(input);
 
             Console.WriteLine(firstTwice);
         }
@@ -764,20 +783,14 @@ namespace AoC2018
             var frequencies = new List<int>();
             var resultingFrequency = 0;
             while (true)
-            {
                 foreach (var currentInput in input)
                 {
                     resultingFrequency += int.Parse(currentInput);
 
-                    if (frequencies.Contains(resultingFrequency))
-                    {
-                        return resultingFrequency;
-                    }
+                    if (frequencies.Contains(resultingFrequency)) return resultingFrequency;
 
                     frequencies.Add(resultingFrequency);
                 }
-
-            }
         }
     }
 
