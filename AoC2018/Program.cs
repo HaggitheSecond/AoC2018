@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using AoC2018.Extensions;
 using AoC2018.Helpers;
@@ -89,7 +90,7 @@ namespace AoC2018
                 }
             }
 
-            new Day7().Part2();
+            new Day5().Part2();
             //new Day5().Part2();
 
             Console.ReadKey();
@@ -346,7 +347,8 @@ namespace AoC2018
                 results.TryAdd(f, reduced);
             });
 
-            foreach (var currentResult in results.OrderBy(f => f.Value.Length)) Console.WriteLine(currentResult.Key + " " + currentResult.Value.Length);
+            foreach (var currentResult in results.OrderBy(f => f.Value.Length))
+                Console.WriteLine(currentResult.Key + " " + currentResult.Value.Length);
 
             Console.ReadKey();
         }
@@ -355,23 +357,32 @@ namespace AoC2018
         {
             while (true)
             {
-                var parts = new ConcurrentBag<string>();
-                for (var i = 0; i < input.Length; i += 100) parts.Add(input.Substring(i, Math.Min(100, input.Length - i)));
+                const int partLength = 100;
 
-                var anyWasReduced = false;
-                var results = new ConcurrentBag<string>();
-                Parallel.ForEach(parts, f =>
+                var parts = new List<string>();
+                for (var i = 0; i < input.Length; i += partLength)
+                    parts.Add(input.Substring(i, Math.Min(partLength, input.Length - i)));
+
+                var anyWasReduced = new ConcurrentBag<bool>();
+                var results = new ConcurrentDictionary<long, string>();
+
+                Parallel.ForEach(parts, (f, state, i) =>
                 {
                     var reduced = TryReduce(f, out var reducedResult);
 
-                    results.Add(reducedResult);
-                    anyWasReduced = reduced;
+                    results.TryAdd(i, reducedResult);
+                    anyWasReduced.Add(reduced);
                 });
+                
+                input = string.Join("", results.OrderBy(f => f.Key).Select(f => f.Value));
 
-                input = string.Join("", results);
-
-                if (anyWasReduced == false)
-                    break;
+                if (anyWasReduced.All(f => f == false))
+                {
+                    if (TryReduce(input, out var reducedResult))
+                        input = reducedResult;
+                    else 
+                        break;
+                }
             }
 
             return input;
